@@ -10,11 +10,17 @@ ifndef ARCH
 	ARCH = $(shell $(CC) -dumpmachine)
 endif
 
-LDFLAGS+=-g -D_REENTRANT -L/usr/local/lib -L../capwap/$(ARCH)
-CFLAGS += -Werror -g -O0 -D_REENTRANT -DIPV6 -I/usr/local/include -I../
+LDFLAGS+=-g -D_REENTRANT -L/usr/local/lib -L../lib/$(ARCH) 
+CFLAGS += -Wall -g -O0 -D_REENTRANT -DIPV6 -I/usr/local/include -I../ -DSYS_ARCH=\"${ARCH}\"
 
 
 LIBS+=-lcapwap
+LIBS+=-lcapwap80211
+LIBS+=-lcipwap
+LIBS+=-lcisco
+LIBS+=-lfortinet
+LIBS+=-lzyxel
+LIBS+=-lcw
 LIBS+=-lrt
 LIBS+=-lpthread
 LIBS+=-lconfuse
@@ -45,12 +51,20 @@ CFLAGS += -DWITH_IPV6
 
 RM = /bin/rm -f 
 
+AC_MODULES = mod_cipwap.o
+
+
 # list of generated object files for AC. 
-AC_OBJS =   wtplist.o wtpman.o conf.o ac_main.o \
-	    ac_interface.o \
-	    socklist.o \
-	    db.o \
-	ac_global.o
+AC_OBJS = \
+	wtplist.o wtpman.o conf.o ac_main.o \
+	dataman.o \
+	ac_interface.o \
+	socklist.o \
+	db.o \
+	ac_global.o \
+	${AC_MODULES}
+
+
 
 AC_SRCS = $(AC_OBJS:.o=.c) 
 AC_DEPS := $(AC_OBJS:.o=.d)
@@ -68,7 +82,7 @@ all: $(AC_NAME)
 
 
 $(AC_NAME): $(AC_OBJS) 
-	$(CC) $(AC_OBJS) -o $(AC_NAME) $(LDFLAGS) $(LIBS)
+	$(CC) $(AC_OBJS) ../mod/modload_ac.o -o $(AC_NAME) $(LDFLAGS) $(LIBS)
 
 
 clean: 

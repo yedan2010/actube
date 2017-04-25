@@ -11,22 +11,23 @@
 #include <net/if.h>
 
 
-#include "capwap/capwap.h"
-#include "capwap/log.h"
-#include "capwap/dbg.h"
+#include "cw/capwap.h"
+#include "cw/log.h"
+#include "cw/dbg.h"
 
-#include "capwap/cw_util.h"
+#include "cw/cw_util.h"
 
 #include "wtp_conf.h"
 
 
-#include "capwap/sock.h"
-#include "capwap/log.h"
+#include "cw/sock.h"
+#include "cw/log.h"
 
-#include "capwap/bstr.h"
-
+#include "cw/bstr.h"
+#include "cw/vendors.h"
 
 char * conf_primary_if=0;
+char * conf_ip=0;
 char * conf_wtpname=0;
 char * conf_dtls_psk=0;
 char * conf_sslkeyfilename=0;
@@ -95,13 +96,12 @@ LONGSTRS conf_timer_cfgstrs[] = {
 int wtpconf_primary_if()
 {
 
-#ifdef WITH_IPV6
-        conf_primary_if  = sock_get_primary_if(AF_INET6);
-        if (!conf_primary_if)
-                conf_primary_if = sock_get_primary_if(AF_INET);
-#else   
-        conf_primary_if = get_primary_if(AF_INET);
-#endif
+	if (!conf_primary_if ) {
+	        conf_primary_if  = sock_get_primary_if(AF_INET6);
+	        if (!conf_primary_if)
+	                conf_primary_if = sock_get_primary_if(AF_INET);
+	}
+
 
         if (!conf_primary_if){
                 cw_log(LOG_ERR,"Fatal: Unable to detect primary interface");
@@ -109,7 +109,10 @@ int wtpconf_primary_if()
         }               
 
         if (!sock_getifhwaddr(conf_primary_if,conf_macaddress,&conf_macaddress_len)){
-                cw_log(LOG_ERR,"Fatal: Unable to detect link layer address for %s.",conf_primary_if);
+
+
+                cw_log(LOG_ERR,"Fatal: Unable to detect link layer address for %s:",conf_primary_if, 
+				strerror(errno));
                 return 0;
         };
 	
@@ -117,10 +120,7 @@ int wtpconf_primary_if()
 			conf_primary_if,
 			sock_hwaddr2str(conf_macaddress,conf_macaddress_len)
 			);
-
-
 	return 1;
-
 }
 
 int wtpconf_name()
@@ -192,6 +192,7 @@ int wtpconf_ac_list()
 	}
 
 	conf_ac_list_len=len;
+
 #ifdef WITH_CW_LOG_DEBUG
 	for (i=0; i<conf_ac_list_len; i++){
 		cw_dbg(DBG_INFO,"Using AC: %s",conf_ac_list[i]);
@@ -217,6 +218,7 @@ int wtpconf_preinit()
 	conf_hardware_version = bstr_create_from_cfgstr(CONF_DEFAULT_HARDWARE_VERSION);
 	conf_bootloader_version = bstr_create_from_cfgstr(CONF_DEFAULT_BOOTLOADER_VERSION);
 	conf_serial_no = bstr_create_from_cfgstr(CONF_DEFAULT_SERIAL_NO);
+	conf_model_no = bstr_create_from_cfgstr(CONF_DEFAULT_MODEL_NO);
 
 	conf_board_id = bstr_create_from_cfgstr(CONF_DEFAULT_BOARD_ID);
 	conf_board_revision = bstr_create_from_cfgstr(CONF_DEFAULT_BOARD_REVISION);
@@ -225,6 +227,7 @@ int wtpconf_preinit()
 
 int wtpconf_init()
 {
+
 
 	if (!wtpconf_primary_if()){
 		cw_log(LOG_ERR,"Fatal: Error initialing primary interface.");

@@ -11,14 +11,14 @@
 
 #include <uci.h>
 
-#include "capwap/capwap.h"
-#include "capwap/log.h"
+#include "cw/capwap.h"
+#include "cw/log.h"
 #include "wtp_conf.h"
 
-#include "capwap/log.h"
-#include "capwap/dbg.h"
+#include "cw/log.h"
+#include "cw/dbg.h"
 
-#include "capwap/bstr.h"
+#include "cw/bstr.h"
 
 
 static struct uci_section  * get_anon_section(struct uci_package * pkg, const char *type)
@@ -43,9 +43,12 @@ static struct uci_section  * get_anon_section(struct uci_package * pkg, const ch
 
 static void set_dbg_opt(struct uci_context *ctx,struct uci_section * section,int opt,const char * optstr)
 {
+
 	const char *str = uci_lookup_option_string(ctx,section,optstr);
-	if (!str)
+	if (!str){
 		return;
+	}
+
 	if ((strcmp(str,"1")==0) || (strcmp(str,"true")==0))
 		//conf_dbg_level |= opt;
 		cw_dbg_set_level(opt,1);
@@ -148,6 +151,14 @@ int read_config(const char * filename){
 	if (str)
 		conf_mtu_discovery = atoi(str);
 
+	str = uci_lookup_option_string(ctx,section,"interface");
+	if (str) 
+		conf_primary_if=strdup(str);
+
+	str = uci_lookup_option_string(ctx,section,"ip");
+	if (str) 
+		conf_ip=strdup(str);
+
 	str = uci_lookup_option_string(ctx,section,"ssl_key");
 	if (str) 
 		conf_sslkeyfilename=strdup(str);
@@ -155,7 +166,10 @@ int read_config(const char * filename){
 	str = uci_lookup_option_string(ctx,section,"ssl_cert");
 	if (str) 
 		conf_sslcertfilename=strdup(str);
-
+	
+	str = uci_lookup_option_string(ctx,section,"dtls_psk");
+	if (str)
+		conf_dtls_psk=strdup(str);
 
 	str = uci_lookup_option_string(ctx,section,"ssl_cipher");
 	if (str) 
@@ -173,47 +187,47 @@ int read_config(const char * filename){
 
 	str = uci_lookup_option_string(ctx,section,"software_version");
 	if (str){
-		uint8_t * s = bstr_create_from_cfgstr(str);
-		bstr_replace(&conf_software_version,s);
+		uint8_t * s = bstr16_create_from_cfgstr(str);
+		bstr16_replace(&conf_software_version,s);
 	}
 
 	str = uci_lookup_option_string(ctx,section,"hardware_version");
 	if (str){
-		uint8_t * s = bstr_create_from_cfgstr(str);
-		bstr_replace(&conf_hardware_version,s);
+		uint8_t * s = bstr16_create_from_cfgstr(str);
+		bstr16_replace(&conf_hardware_version,s);
 	}
 
 	str = uci_lookup_option_string(ctx,section,"bootloader_version");
 	if (str){
-		uint8_t * s = bstr_create_from_cfgstr(str);
-		bstr_replace(&conf_bootloader_version,s);
+		uint8_t * s = bstr16_create_from_cfgstr(str);
+		bstr16_replace(&conf_bootloader_version,s);
 	}
 
 
 	str = uci_lookup_option_string(ctx,section,"board_id");
 	if (str){
-		uint8_t * s = bstr_create_from_cfgstr(str);
-		bstr_replace(&conf_board_id,s);
+		uint8_t * s = bstr16_create_from_cfgstr(str);
+		bstr16_replace(&conf_board_id,s);
 	}
 
 	str = uci_lookup_option_string(ctx,section,"board_revision");
 	if (str){
-		uint8_t * s = bstr_create_from_cfgstr(str);
-		bstr_replace(&conf_board_revision,s);
+		uint8_t * s = bstr16_create_from_cfgstr(str);
+		bstr16_replace(&conf_board_revision,s);
 	}
 
 
 	str = uci_lookup_option_string(ctx,section,"serial_no");
 	if (str){
-		uint8_t * s = bstr_create_from_cfgstr(str);
-		bstr_replace(&conf_serial_no,s);
+		uint8_t * s = bstr16_create_from_cfgstr(str);
+		bstr16_replace(&conf_serial_no,s);
 	}
 
 
 	str = uci_lookup_option_string(ctx,section,"model_no");
 	if (str){
-		uint8_t * s = bstr_create_from_cfgstr(str);
-		bstr_replace(&conf_model_no,s);
+		uint8_t * s = bstr16_create_from_cfgstr(str);
+		bstr16_replace(&conf_model_no,s);
 	}
 
 	

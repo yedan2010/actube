@@ -1,10 +1,11 @@
 #include <errno.h>
 #include "wtp.h"
 
-#include "capwap/log.h"
-#include "capwap/dbg.h"
-#include "capwap/capwap.h"
-#include "capwap/capwap_items.h"
+#include "cw/log.h"
+#include "cw/dbg.h"
+#include "cw/capwap.h"
+#include "cw/capwap_items.h"
+#include "cw/vendors.h"
 
 
 int image_update()
@@ -17,7 +18,7 @@ int image_update()
 
 
 	const char *ii = "/c1130";
-	mbag_set_vendorstr(conn->outgoing, CW_ITEM_IMAGE_IDENTIFIER,
+	mbag_set_bstrv(conn->outgoing, CW_ITEM_IMAGE_IDENTIFIER,
 				   CW_VENDOR_ID_CISCO, (uint8_t *) ii, strlen(ii));
 
 

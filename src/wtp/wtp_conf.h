@@ -3,8 +3,8 @@
 
 #include <sys/socket.h>
 
-#include "capwap/capwap.h"
-#include "capwap/bstr.h"
+#include "cw/capwap.h"
+#include "cw/bstr.h"
 
 
 
@@ -35,6 +35,7 @@ extern bstr_t conf_board_revision;
 
 extern struct sockaddr_storage * conf_preffered_ac_sa;
 extern char * conf_primary_if;
+extern char * conf_ip;
 
 extern char ** conf_ac_list;
 
@@ -145,5 +146,8 @@ extern LONGSTRS conf_timer_cfgstrs[];
 int wtpconf_preinit();
 int wtpconf_init();
 
+
+#define WTP_DEFAULT_NAME_PREFIX "WFAT-"
+#define WTP_DEFAULT_LOCATION_DATA "Superposition"
 
 #endif

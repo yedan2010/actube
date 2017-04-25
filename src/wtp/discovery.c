@@ -24,14 +24,14 @@
 #include <sys/socket.h>
 
 
-#include "capwap/capwap.h"
-#include "capwap/capwap_items.h"
-#include "capwap/log.h"
-#include "capwap/sock.h"
-#include "capwap/cw_util.h"
-#include "capwap/aciplist.h"
-#include "capwap/acpriolist.h"
-#include "capwap/timer.h"
+#include "cw/capwap.h"
+#include "cw/capwap_items.h"
+#include "cw/log.h"
+#include "cw/sock.h"
+#include "cw/cw_util.h"
+#include "cw/aciplist.h"
+#include "cw/acpriolist.h"
+#include "cw/timer.h"
 
 
 #include "wtp.h"
@@ -42,56 +42,70 @@
 
 
 
-cw_aciplist_t cw_select_ac(struct conn *conn, mbag_t dis)
+cw_aciplist_t cw_select_ac(struct conn *conn, mbag_t discs)
 {
 
+	/* create a list for results */
+	cw_aciplist_t resultlist=cw_aciplist_create();
+	if (!resultlist)
+		return NULL;
+	if (!discs)
+		return resultlist;
+
+/*
 	cw_aciplist_t aciplist = cw_aciplist_create();
 	if (!aciplist) {
 		cw_log(LOG_ERROR, "Can't allocate aciplist");
 		return NULL;
 	}
 
-
-//	mbag_t aclist = mbag_get_mbag(conn->config, CW_ITEM_AC_NAME_WITH_PRIORITY);
-
+*/
 
 	/* get the AC Name with Priority list */
 	cw_acpriolist_t priolist;
 	priolist = mbag_get_mavl(conn->config, CW_ITEM_AC_NAME_WITH_PRIORITY);
-//	if (priolist )
+	if (!priolist )
 		priolist=cw_acpriolist_create();
 
-	cw_aciplist_t resultlist=cw_aciplist_create();
 
-
-	DEFINE_AVLITER(i, dis);
+	/* for each discovery reponse */
+	DEFINE_AVLITER(i, discs);
 	avliter_foreach(&i){
+
 		mbag_t ac = ((mbag_item_t *) (avliter_get(&i)))->data;
 
+		/* get the ac name */
 		char *ac_name = mbag_get_str(ac, CW_ITEM_AC_NAME,NULL);
-
 		int prio = 256;
+
 		if (ac_name) {
 			/* See if we can find AC Name in Priority List */
 			if (priolist)
 				prio = cw_acpriolist_get(priolist, ac_name);
-			else
-				prio = 256;
-printf("Prio for %s is %d\n",ac_name,prio);
-printf("nprio: %d\n",priolist->count);
-
 		}
 
+		/* get the IP list, the current AC has sent */
 		cw_aciplist_t acips =
 		    mbag_get_mavl(ac, CW_ITEM_CAPWAP_CONTROL_IP_ADDRESS_LIST);
 
+		if (!acips)
+			continue;
+
+		/* for each IP from the current AC add it to the result list
+		 * and give it the priority whe have determined */
 		DEFINE_AVLITER(i2, acips);
 		avliter_foreach(&i2){
+
+
 			cw_acip_t *acip = avliter_get(&i2);
+
 			cw_acip_t *n = malloc(sizeof(cw_acip_t));
 			memcpy(n,acip,sizeof(cw_acip_t));
-			
-			n->wtp_count |= prio<<16; 
+		
+			/* we missuse the wtp_count to sort by 
+			 * priority and wp_count */	
+			n->index |= prio<<16; 
+
 			cw_aciplist_del(resultlist,n);
 			cw_aciplist_add(resultlist,n);
 		}
@@ -99,7 +113,6 @@ printf("nprio: %d\n",priolist->count);
 	}
 
 	return resultlist;
-
 }
 
 
@@ -210,6 +223,19 @@ static int cw_run_discovery(struct conn *conn, const char *acaddr)
 		sock_set_dontfrag(sockfd, 0);
 
 		sock_copyaddr(&conn->addr, res->ai_addr);
+
+		
+		if (conf_ip){		
+			struct sockaddr bind_address;
+			sock_strtoaddr(conf_ip,&bind_address); 
+			int brc = bind(sockfd,&bind_address,sock_addrlen(&bind_address));
+			if (brc<0) {
+				cw_log(LOG_ERR,"Can't bind to %s",sock_addr2str(&bind_address));
+				return 0;
+			}
+		}
+
+
 		conn->sock = sockfd;
 		conn->readfrom = conn_recvfrom_packet;
 
@@ -230,6 +256,9 @@ static int cw_run_discovery(struct conn *conn, const char *acaddr)
 int discovery()
 {
 	struct conn *conn = get_conn();
+
+	printf("Radios = %d\n",conn->radios->count);
+
 	cw_run_discovery(conn, "255.255.255.255");
 	conn->capwap_state=CW_STATE_JOIN;
 	return 1;

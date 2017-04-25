@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 KEYSIZE=2048
 #OPENSSL="../src/contrib/openssl-1.0.1i/apps/openssl"
@@ -38,7 +38,7 @@ createcert()
        		 -subj "$SUBJ"
 
 
-	$OPENSSL ca -config openssl-crt.cnf  \
+	$OPENSSL ca -config openssl.cnf  \
 		   -keyfile $INT_CA_DIR/${PREF}int-ca.key \
 		   -cert $INT_CA_DIR/${PREF}int-ca.crt \
 		   -batch \
@@ -74,7 +74,7 @@ fi
 if [ "$TYPE" = "cisco-ap" ]
 then
 	PREF="$2-"
-	SUBJ="/C=US/ST=California/L=San Jose/O=Cisco Systems/CN=C1130-0019dbe09327/emailAddress=support@cisco.com"
+	SUBJ="/C=US/ST=California/L=San Jose/O=Cisco Systems/CN=C1130-902b34de9ef1/emailAddress=support@cisco.com"
 
        openssl req -nodes -new -x509 \
                 -sha1 \

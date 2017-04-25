@@ -8,14 +8,14 @@
 #include "wtp_interface.h"
 #include "wtp_conf.h"
 
-#include "capwap/dtls.h"
-#include "capwap/log.h"
-#include "capwap/dbg.h"
-#include "capwap/sock.h"
-#include "capwap/dtls.h"
-#include "capwap/aciplist.h"
-#include "capwap/capwap_items.h"
-#include "capwap/mbag.h"
+#include "cw/dtls.h"
+#include "cw/log.h"
+#include "cw/dbg.h"
+#include "cw/sock.h"
+#include "cw/dtls.h"
+#include "cw/aciplist.h"
+#include "cw/capwap_items.h"
+#include "cw/mbag.h"
 
 /*
 #define acinfo_log acinfo_log_
@@ -97,58 +97,74 @@ acinfo.result_code=99;
 int run_join_d(struct sockaddr *sa)
 {
 	struct conn *conn = get_conn();
-	conn->capwap_state=CW_STATE_JOIN;
+	conn->capwap_state = CW_STATE_JOIN;
 
 	int sockfd;
 	int rc;
 
-	sockfd = socket(AF_INET,SOCK_DGRAM,0);
-	if (sockfd==-1){
-		cw_log(LOG_ERR,"Can't create socket: %s\n",strerror(errno));
+	sockfd = socket(sa->sa_family, SOCK_DGRAM, 0);
+	if (sockfd == -1) {
+		cw_log(LOG_ERR, "Can't create socket: %s\n", strerror(errno));
 		return -1;
 	}
-	sock_set_recvtimeout(sockfd,1);
+	sock_set_recvtimeout(sockfd, 1);
+	conn->sock = sockfd;
+	sock_copyaddr(&conn->addr, sa);
 
-	rc = connect(sockfd,(struct sockaddr*)sa,sock_addrlen((struct sockaddr*)sa));
 
-	if (rc<0){
-		cw_log(LOG_ERR,"Can't connect to %s: %s\n",sock_addr2str(sa),strerror(errno));
+	/* we call connect to bind this socket to a local IP address,
+	 * which we can later obtain by getsockname */
+/*	rc = connect(sockfd, (struct sockaddr *) sa,
+		     sock_addrlen((struct sockaddr *) sa));
+
+	if (rc < 0) {
+		cw_log(LOG_ERR, "Can't connect to %s: %s\n", sock_addr2str(sa),
+		       strerror(errno));
 		close(sockfd);
 		return -1;
 	}
+*/
 
-	conn->sock=sockfd;
-	sock_copyaddr(&conn->addr,sa);
+	cw_dbg(DBG_DTLS, "Establishing DTLS session with %s", sock_addr2str(sa));
 
-	cw_dbg (DBG_DTLS,"Establishing DTLS session with %s",sock_addr2str(sa)); 
+	int dtls_conf_ok=0;
 
-	if (conf_dtls_psk){
-		conn->dtls_psk=conf_dtls_psk;
-		conn->dtls_psk_len=strlen(conn->dtls_psk);
-		conn->dtls_cipher=conf_dtls_cipher;
+	if (conf_dtls_psk) {
+		conn->dtls_psk = conf_dtls_psk;
+		conn->dtls_psk_len = strlen(conn->dtls_psk);
+		conn->dtls_cipher = conf_dtls_cipher;
+		dtls_conf_ok=1;
 	}
 
-	if (conf_sslkeyfilename && conf_sslcertfilename){
+	if (conf_sslkeyfilename && conf_sslcertfilename) {
 
 		conn->dtls_key_file = conf_sslkeyfilename;
 		conn->dtls_cert_file = conf_sslcertfilename;
 		conn->dtls_key_pass = conf_sslkeypass;
-		conn->dtls_cipher=conf_dtls_cipher;
-	
+		conn->dtls_cipher = conf_dtls_cipher;
+		dtls_conf_ok=1;
 	}
 
-
-
-	rc = dtls_connect(conn);
-	if (rc!=1){
-		dtls_shutdown(conn);
-		cw_log(LOG_ERR,"Can't establish DTLS connection to %s", sock_addr2str(sa));
+	if (!dtls_conf_ok){
+		cw_log(LOG_ERR,"Can't establish DTLS connection with %s, neither psk nor cert set in config",
+			sock_addr2str(sa));
 		close(sockfd);
 		return 0;
 	}
 
 
-	cw_dbg (DBG_DTLS,"DTLS Connection successful established with %s",sock_addr2str(sa)); 
+	rc = dtls_connect(conn);
+	if (rc != 1) {
+		dtls_shutdown(conn);
+		cw_log(LOG_ERR, "Can't establish DTLS connection with %s",
+		       sock_addr2str(sa));
+		close(sockfd);
+		return 0;
+	}
+
+
+	cw_dbg(DBG_DTLS, "DTLS Connection successful established with %s",
+	       sock_addr2str(sa));
 
 
 
@@ -156,31 +172,36 @@ int run_join_d(struct sockaddr *sa)
 }
 
 
-int run_join(struct conn * conn)
+int run_join(struct conn *conn)
 {
 
-//	cw_init_request(conn, CW_MSG_JOIN_REQUEST);
-//	if ( cw_put_msg(conn, conn->req_buffer) == -1 )
-//		return 0;
+//      cw_init_request(conn, CW_MSG_JOIN_REQUEST);
+//      if ( cw_put_msg(conn, conn->req_buffer) == -1 )
+//              return 0;
 //
-//	conn_send_msg(conn, conn->req_buffer);
+//      conn_send_msg(conn, conn->req_buffer);
 
-	int rc = cw_send_request(conn,CW_MSG_JOIN_REQUEST);
 
-	if (!cw_rcok(rc) ) {
-		if (rc>0 ){
-			cw_log(LOG_ERR,"Can't Join AC at %s, AC said: %d - %s.",
-				sock_addr2str(&conn->addr),rc,cw_strerror(rc));
+	mbag_del_all(conn->incomming);
 
-		}
-		else{
-			cw_log(LOG_ERR,"Can't Join AC at %s: %d - %s.",
-					sock_addr2str(&conn->addr),errno,cw_strerror(rc));
+	//mbag_del (conn->incomming,CW_ITEM_RESULT_CODE);
+
+	int rc = cw_send_request(conn, CW_MSG_JOIN_REQUEST);
+
+	if (!cw_rcok(rc)) {
+		if (rc > 0) {
+			cw_log(LOG_ERR, "Can't Join AC at %s, AC said: %d - %s.",
+			       sock_addr2str(&conn->addr), rc, cw_strerror(rc));
+
+		} else {
+			cw_log(LOG_ERR, "Can't Join AC at %s: %d - %s.",
+			       sock_addr2str(&conn->addr), errno, cw_strerror(rc));
 		}
 		return 0;
 	}
 
-	cw_dbg(DBG_ELEM,"Joined AC at %s,  Join Result: %d - %s",sock_addr2str(&conn->addr),rc,cw_strresult(rc));
+	cw_dbg(DBG_ELEM, "Joined AC at %s,  Join Result: %d - %s",
+	       sock_addr2str(&conn->addr), rc, cw_strresult(rc));
 
 	return 1;
 }
@@ -189,34 +210,50 @@ int run_join(struct conn * conn)
 
 int join()
 {
-	struct conn * conn = get_conn();
+	struct conn *conn = get_conn();
 
-	cw_aciplist_t iplist = mbag_get_mavl(conn->local,CW_ITEM_CAPWAP_CONTROL_IP_ADDRESS_LIST);
-	if (!iplist){
-		cw_log(LOG_ERR,"No IPs to join controller.");
+	printf("Join\n");
+
+	mbag_del_all(conn->incomming);
+
+	cw_aciplist_t iplist =
+	    mbag_get_mavl(conn->local, CW_ITEM_CAPWAP_CONTROL_IP_ADDRESS_LIST);
+	if (!iplist) {
+		cw_log(LOG_ERR, "No IPs to join controller.");
 		return 0;
 	}
 
-	DEFINE_AVLITER(ii,iplist);
-	avliter_foreach(&ii){
-		cw_acip_t * ip = avliter_get(&ii);
+	if (!mavl_get_count(iplist)){
+		cw_log(LOG_ERR, "No IPs to join controller. IP list is empty.");
+		return 0;
+	}
 
-		cw_dbg(DBG_INFO,"Going to join CAWAP controller on %s",sock_addr2str(&ip->ip));
 
-		int rc = run_join_d((struct sockaddr*)&ip->ip);
-		if (!rc) 
+	DEFINE_AVLITER(ii, iplist);
+	avliter_foreach(&ii) {
+
+		cw_acip_t *ip = avliter_get(&ii);
+
+
+		cw_dbg(DBG_INFO, "Going to join CAWAP controller on %s",
+		       sock_addr2str_p(&ip->ip));
+
+		int rc = run_join_d((struct sockaddr *) &ip->ip);
+
+		if (rc<=0)
 			continue;
+
 		rc = run_join(conn);
-		if (rc){
-			conn->capwap_state=CW_STATE_CONFIGURE;
+		if (rc) {
+			conn->capwap_state = CW_STATE_CONFIGURE;
 			return 1;
 		}
-		
-		
+
+
 
 	}
+
 
 	return 0;
 
 }
-

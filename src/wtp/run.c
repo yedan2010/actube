@@ -3,35 +3,118 @@
 #include <errno.h>
 #include <string.h>
 
-#include "capwap/capwap.h"
-#include "capwap/conn.h"
-#include "capwap/radioinfo.h"
-#include "capwap/log.h"
-#include "capwap/dtls.h"
-#include "capwap/sock.h"
-#include "capwap/cw_util.h"
-#include "capwap/capwap_items.h"
+#include "cw/capwap.h"
+#include "cw/conn.h"
+#include "cw/radioinfo.h"
+#include "cw/log.h"
+#include "cw/dtls.h"
+#include "cw/sock.h"
+#include "cw/cw_util.h"
+#include "cw/capwap_items.h"
 
 
 #include "wtp_conf.h"
 
 
-#include "capwap/timer.h"
+#include "cw/timer.h"
 
 
 
-#include "capwap/capwap.h"
-#include "capwap/conn.h"
+#include "cw/capwap.h"
+#include "cw/conn.h"
 #include "wtp_interface.h"
+
+#include "cw/dbg.h"
+#include "cfg.h"
+
+int update =0;
+
+int handle_update_req(struct conn *conn, struct cw_action_in *a, uint8_t * data,
+		      int len, struct sockaddr *from)
+{
+	if (a->msg_id == CW_MSG_CONFIGURATION_UPDATE_REQUEST){
+		update =1;
+
+	}
+
+	return 0;
+
+	MAVLITER_DEFINE(it, conn->incomming);
+
+	mavliter_foreach(&it) {
+		mbag_item_t *item = mavliter_get(&it);
+
+
+	}
+cw_dbg(DBG_X,"Saving configuration ...");	
+		cfg_to_json();
+
+	return 0;
+
+}
+
+
+
+
+
+static void update_radio(struct conn * conn, int rid, mbag_t radio_upd, mbag_t radio,mbag_t iresult )
+{
+
+	printf("Updating radio with rid %d\n",rid);
+}
+
+static void update_radios(struct conn * conn, mbag_t result)
+{
+	MAVLITER_DEFINE (it,conn->radios_upd);
+	mavliter_foreach(&it){
+		struct mbag_item * item = mavliter_get(&it);
+		int rid = item->iid;
+		mbag_t radio = mbag_i_get_mbag(conn->radios,rid,NULL);
+		if (!radio){
+			cw_dbg(DBG_ELEM_ERR,"Can't find radio with id %d",rid);
+			continue;
+		}
+
+		mbag_t iresult = mbag_create();
+		mbag_i_set_mbag(result,rid,iresult);		
+		update_radio(conn,rid,item->data,radio,iresult);
+	}
+
+}
+
+
+static void do_update(struct conn * conn)
+{
+	if (!update)
+		return;
+	update=0;
+
+	mbag_t result = mbag_create();
+	update_radios(conn,result);
+	cw_dbg(DBG_INFO, "Saving configuration ...");
+	cfg_to_json();
+	/* Change State ... */
+	int rc = cw_send_request(conn,CW_MSG_CHANGE_STATE_EVENT_REQUEST);
+	if ( !cw_rcok(rc) ) {
+		cw_strresult(rc);
+		return ;
+	}
+
+
+
+}
+
+
 
 
 int run()
 {
 
 
-
 	struct conn *conn = get_conn();
 	conn->capwap_state = CW_STATE_RUN;
+
+	conn->msg_end=handle_update_req;
 
 	do {
 
@@ -50,6 +133,12 @@ int run()
 
 			if ( !cw_rcok(rc))
 				break;
+
+
+			cw_dbg(DBG_X,"We hav a message processed");
+
+			do_update(conn);
+
 
 		}
 		if (rc<0 && errno == EAGAIN){

@@ -1,9 +1,10 @@
 include ../Config.mak
 
 #
-SSL_LIBRARY=GNUTLS
-
-
+# Define witch SSL library to use
+# OPENSSL or GNUTLS
+#
+SSL_LIBRARY=OPENSSL
 
 CFLAGS += -I/usr/include/libnl3
 CFLAGS += -I../contrib/uci

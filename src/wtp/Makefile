@@ -22,15 +22,23 @@ endif
 
 CFLAGS += -O0 -Wall -Wno-unused-variable -Werror -g
 #CFLAGS += -Os -Wall 
-LDFLAGS += -L../contrib/jsmn -L../../src/capwap/$(ARCH) 
+LDFLAGS += -L../contrib/jsmn -L../../src/lib/$(ARCH) 
+
+
+CONFOBJS = wtp_conf.o
 
 
 LIBS+=-lcapwap
+LIBS+=-lcapwap80211
+LIBS+=-lcipwap
+LIBS+=-lcisco
+LIBS+=-lfortinet
+LIBS+=-lcw
 LIBS+=-lnl-3
 LIBS+=-lnl-genl-3
 LIBS+=-ljsmn
 
-CONFOBJS = wtp_conf.o
+
 
 ifeq ($(CONF_LIBRARY),UCI)
 CFLAGS+=-DWITH_UCI
@@ -96,6 +104,7 @@ OBJS += run.o
 OBJS += sulking.o
 OBJS += configure.o
 OBJS += changestate.o
+OBJS += setup_conf.o
 OBJS += $(CONFOBJS)
 
 
@@ -121,8 +130,8 @@ endif
 	$(Q)$(CC) -c -o $@ $(CFLAGS) $<
 
 
-wtp: $(BCHECK) $(OBJS)
-	$(Q)$(CC) $(OBJS) -o wtp $(LDFLAGS) $(LIBS)
+wtp: $(OBJS)
+	$(Q)$(CC) $(OBJS) ../mod/modload_wtp.o -o wtp $(LDFLAGS) $(LIBS)
 	@$(E) "  LD " $@
 
 clean:

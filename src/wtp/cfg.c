@@ -1,27 +1,23 @@
-#include "capwap/mbag.h"
-#include "capwap/capwap_items.h"
-#include "capwap/radio.h"
-
-#include "capwap/conn.h"
-#include "capwap/bstr.h"
-
 #include <errno.h>
 #include <stdio.h>
 
 #include "jsmn.h"
 #include "wtp.h"
-#include "capwap/bstr.h"
+#include "cw/bstr.h"
 
-#include "capwap/mavl.h"
-#include "capwap/format.h"
-#include "capwap/file.h"
-//#include "capwap/aciplist.h"
-//#include "capwap/acpriolist.h"
-#include "capwap/sock.h"
-#include "capwap/item.h"
-#include "capwap/action.h"
+#include "cw/mavl.h"
+#include "cw/format.h"
+#include "cw/file.h"
+#include "cw/sock.h"
+#include "cw/item.h"
+#include "cw/action.h"
+#include "cw/mbag.h"
+#include "cw/capwap_items.h"
+#include "cw/radio.h"
+#include "cw/conn.h"
+#include "cw/bstr.h"
 
-
+#include "cw/dbg.h"
 
 
 static int skip(jsmntok_t * t)
@@ -48,6 +44,7 @@ void set_cfg(mbag_t mbag, cw_itemdefheap_t defs, const char *id, const char *sub
 	//printf("Setting: %s/%s: %s\n",id,subid,val);
 	const cw_itemdef_t *idef;
 
+printf("Looking for def of: %s\n",id);
 	int dyn=0;
 	if (!subid) {
 		idef = cw_itemdef_get(defs,id,subid);
@@ -59,12 +56,10 @@ void set_cfg(mbag_t mbag, cw_itemdefheap_t defs, const char *id, const char *sub
 			if (idef)
 				dyn=1;
 		}
-
-
 	}
 
 	if (!idef) {
-		fprintf(stderr,"No definition for item %s/%s not found\n",id,subid);
+		fprintf(stderr,"CFG: No definition for item %s/%s not found\n",id,subid);
 		return ;
 	}
 
@@ -141,7 +136,7 @@ static int scn_radios(char *js, jsmntok_t * t)
 			
 			printf("Radio id %d\n",rid);
 			mbag_t radio=mbag_i_get_mbag_c(conn->radios,rid,mbag_create);
-			scn_obj(js,to+1,radio,conn->actions->radioitems,NULL);	
+			scn_obj(js,to+1,radio,conn->actions->radioitems /*radioitems*/,NULL);	
 
 		}
 
@@ -196,7 +191,7 @@ static int scn_obj(char *js, jsmntok_t * t,
 		*(js + (to + 1)->end) = 0;
 		const char * val = js+(to+1)->start;
 
-		//printf("Key: %s Val: %s\n",key,val);
+		printf("Key: %s Val: %s\n",key,val);
 		
 
 		if ((to+1)->type == JSMN_OBJECT) {
@@ -246,16 +241,12 @@ int cfg_json_put_radios(char *dst, const char *name, mbag_item_t * i, int n)
 	const char *comma = "";
 	mavliter_foreach(&radios) {
 		mbag_item_t *i = mavliter_get(&radios);
-//		int rid = i->iid;
-		//mbag_t radio = i->data;
 
 		d += sprintf(d, "%s", comma);
 		comma = ",\n";
 		memset(d, '\t', n + 1);
 		d += n + 1;
 		d += sprintf(d, "\"%d\":", i->iid);
-
-		//d += mbag_tojson(d, i->data, radio_cfg, n + 1);
 	}
 
 	d += sprintf(d, "\n");
@@ -327,8 +318,17 @@ int mbag_tojson(char *dst, mbag_t m, cw_itemdef_t *defs, int n)
 			d+=sprintf(d,"\"");
 			if (i->type->to_str){
 				d+=i->type->to_str(i,d);
+
+//				char bu[1000];
+//				i->type->to_str(i,bu);
+//				cw_dbg(DBG_X,"Put: %s::: %s",i->id,bu);
+			}
+			else{
+				cw_dbg(DBG_X,"No to_str method for %s",i->id);
 			}
 			d+=sprintf(d,"\"");
+
+
 		}
 	}
 	if (n==0){

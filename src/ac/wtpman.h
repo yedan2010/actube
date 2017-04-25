@@ -5,8 +5,9 @@
 #include <semaphore.h>
 #include <pthread.h>
 
-#include "capwap/capwap.h"
-#include "capwap/fragman.h"
+#include "cw/capwap.h"
+#include "cw/fragman.h"
+#include "cw/timer.h"
 
 #define WTPMAN_QSIZE 1024
 
@@ -32,7 +33,10 @@ struct wtpman{
 
 
 	int socklistindex;
-	int connected; 
+	int connected;
+
+
+	cw_timer_t echointerval_timer; 
 
 
 };
